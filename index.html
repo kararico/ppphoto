@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PPPHOTO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;800;900&family=Noto+Sans:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg: #060207;
+    --surface: #0f0812;
+    --surface-2: #170c1e;
+    --purple-deep: #2b1339;
+    --purple-mid: #3d1a50;
+    --purple-line: #4a2160;
+    --white: #ffffff;
+    --gray: #9c8fa6;
+    --gray-dim: #5f5468;
+    --radius: 18px;
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  html,body{
+    background: var(--bg);
+    color: var(--white);
+    font-family:'Noto Sans KR','Noto Sans',sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  body{
+    display:flex;
+    justify-content:center;
+    background:
+      radial-gradient(ellipse 600px 400px at 50% 0%, rgba(74,33,96,0.35), transparent 70%),
+      var(--bg);
+  }
+  .app{
+    width:100%;
+    max-width:460px;
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    position:relative;
+  }
+
+  /* Header */
+  header{
+    padding:22px 22px 14px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .logo-mark{
+    width:10px;height:10px;
+    background:var(--purple-line);
+    box-shadow:0 0 12px var(--purple-mid);
+    border-radius:2px;
+  }
+  .logo-text{
+    font-weight:900;
+    font-size:20px;
+    letter-spacing:2px;
+  }
+  .logo-text span{ color: #b088c9; }
+
+  main{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+  }
+
+  /* Photo frame - 5(세로):3(가로) full width */
+  .photo-frame{
+    position:relative;
+    width:100%;
+    aspect-ratio: 3 / 4;
+    background: linear-gradient(160deg, var(--surface-2), var(--surface));
+    overflow:hidden;
+    cursor:pointer;
+    border-top:1px solid var(--purple-line);
+    border-bottom:1px solid var(--purple-line);
+  }
+  .photo-frame img{
+    width:100%;
+    height:100%;
+    object-fit:cover;
+    display:none;
+  }
+  .empty-state{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:12px;
+    color: var(--gray);
+    text-align:center;
+    padding:0 30px;
+  }
+  .empty-state .plus{
+    width:52px;height:52px;
+    border-radius:50%;
+    border:1.5px solid var(--purple-line);
+    display:flex;align-items:center;justify-content:center;
+    font-size:26px;
+    font-weight:300;
+    color:#c9a9de;
+  }
+  .empty-state small{
+    font-size:13px;
+    color:var(--gray-dim);
+  }
+
+  /* Overlay on photo */
+  .overlay{
+    position:absolute;
+    inset:0;
+    display:none;
+    flex-direction:column;
+    justify-content:flex-end;
+    padding:22px;
+    background: linear-gradient(180deg, transparent 40%, rgba(6,2,7,0.15) 65%, rgba(6,2,7,0.75) 100%);
+    pointer-events:none;
+  }
+  .overlay.show{ display:flex; }
+
+  .align-toolbar{
+    position:absolute;
+    top:14px;
+    right:14px;
+    display:flex;
+    gap:4px;
+    background: rgba(15,8,18,0.65);
+    border:1px solid var(--purple-line);
+    border-radius:10px;
+    padding:4px;
+    pointer-events:auto;
+    backdrop-filter: blur(6px);
+  }
+  .align-btn{
+    width:28px;height:28px;
+    border:none;
+    background:transparent;
+    color:var(--gray);
+    border-radius:7px;
+    cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+    font-size:14px;
+  }
+  .align-btn.active{
+    background: var(--purple-mid);
+    color:var(--white);
+  }
+  .align-icon{
+    display:flex;
+    flex-direction:column;
+    gap:3px;
+    width:16px;
+  }
+  .align-icon i{
+    display:block;
+    height:2px;
+    background:currentColor;
+    border-radius:1px;
+  }
+  .align-icon-left{ align-items:flex-start; }
+  .align-icon-left i:nth-child(1){ width:100%; }
+  .align-icon-left i:nth-child(2){ width:65%; }
+  .align-icon-left i:nth-child(3){ width:82%; }
+  .align-icon-center{ align-items:center; }
+  .align-icon-center i:nth-child(1){ width:100%; }
+  .align-icon-center i:nth-child(2){ width:55%; }
+  .align-icon-center i:nth-child(3){ width:78%; }
+  .align-icon-right{ align-items:flex-end; }
+  .align-icon-right i:nth-child(1){ width:100%; }
+  .align-icon-right i:nth-child(2){ width:65%; }
+  .align-icon-right i:nth-child(3){ width:82%; }
+
+  .title-text{
+    font-family:'Noto Sans KR','Noto Sans',sans-serif;
+    font-weight:800;
+    font-size:35px;
+    line-height:1.2;
+    color:var(--white);
+    outline:none;
+    pointer-events:auto;
+    word-break:break-word;
+    min-height:1.2em;
+  }
+  .title-text:empty::before{
+    content:attr(data-placeholder);
+    color:rgba(255,255,255,0.35);
+  }
+  .date-text{
+    font-family:'Noto Sans KR','Noto Sans',sans-serif;
+    font-weight:500;
+    font-size:15px;
+    color:rgba(255,255,255,0.8);
+    margin-top:6px;
+    outline:none;
+    pointer-events:auto;
+  }
+  .align-left{ text-align:left; }
+  .align-center{ text-align:center; }
+  .align-right{ text-align:right; }
+
+  /* Tag + save section */
+  .panel{
+    padding:20px 22px 28px;
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+  }
+  .field-label{
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:1px;
+    color:var(--gray);
+    text-transform:uppercase;
+  }
+  .tag-box{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+    align-items:center;
+    background:var(--surface);
+    border:1px solid var(--purple-deep);
+    border-radius:12px;
+    padding:10px 12px;
+    min-height:46px;
+  }
+  .tag-chip{
+    background:var(--purple-deep);
+    border:1px solid var(--purple-line);
+    color:var(--white);
+    font-size:13px;
+    padding:5px 10px 5px 12px;
+    border-radius:100px;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .tag-chip button{
+    background:none;border:none;color:var(--gray);
+    cursor:pointer;font-size:14px;line-height:1;
+  }
+  #tagInput{
+    flex:1;
+    min-width:80px;
+    background:transparent;
+    border:none;
+    outline:none;
+    color:var(--white);
+    font-size:13px;
+    font-family:'Noto Sans KR','Noto Sans',sans-serif;
+  }
+  #tagInput::placeholder{ color:var(--gray-dim); }
+  #tagAddBtn{
+    background: var(--purple-deep);
+    border:1px solid var(--purple-line);
+    color:var(--white);
+    font-size:12px;
+    font-weight:600;
+    padding:6px 12px;
+    border-radius:100px;
+    cursor:pointer;
+    flex-shrink:0;
+  }
+
+  .btn-row{
+    display:flex;
+    gap:10px;
+  }
+  button.primary{
+    flex:1;
+    background: linear-gradient(135deg, var(--purple-mid), #241030);
+    border:1px solid var(--purple-line);
+    color:var(--white);
+    font-weight:700;
+    font-size:14px;
+    padding:14px;
+    border-radius:12px;
+    cursor:pointer;
+    letter-spacing:0.5px;
+  }
+  button.primary:disabled{
+    opacity:0.35;
+    cursor:not-allowed;
+  }
+  button.ghost{
+    background:transparent;
+    border:1px solid var(--purple-deep);
+    color:var(--gray);
+    font-weight:600;
+    font-size:14px;
+    padding:14px 18px;
+    border-radius:12px;
+    cursor:pointer;
+  }
+
+  /* Gallery */
+  .gallery-section{
+    padding:8px 22px 60px;
+  }
+  .gallery-section .field-label{ margin-bottom:14px; display:block; }
+  .gallery-grid{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+  }
+  .gallery-item{
+    position:relative;
+    aspect-ratio:3/4;
+    border-radius:10px;
+    overflow:hidden;
+    background:var(--surface);
+    border:1px solid var(--purple-deep);
+  }
+  .gallery-item img{
+    width:100%;height:100%;object-fit:cover;
+  }
+  .gallery-item .g-overlay{
+    position:absolute;inset:0;
+    display:flex;flex-direction:column;justify-content:flex-end;
+    padding:10px;
+    background:linear-gradient(180deg, transparent 50%, rgba(6,2,7,0.85) 100%);
+  }
+  .gallery-item .g-title{
+    font-weight:800;
+    font-size:14px;
+    color:var(--white);
+  }
+  .gallery-item .g-date{
+    font-size:10px;
+    color:rgba(255,255,255,0.7);
+    margin-top:2px;
+  }
+  .gallery-item .g-tags{
+    margin-top:6px;
+    font-size:11px;
+    line-height:1.4;
+    color:rgba(255,255,255,0.85);
+    text-align:left;
+    word-break:break-word;
+  }
+  .gallery-empty{
+    color:var(--gray-dim);
+    font-size:13px;
+    text-align:center;
+    padding:30px 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo-mark"></div>
+    <div class="logo-text">PPPHOTO</div>
+  </header>
+
+  <main>
+    <div class="photo-frame" id="photoFrame">
+      <img id="photoImg" alt="등록된 사진">
+      <div class="empty-state" id="emptyState">
+        <div class="plus">＋</div>
+        <div>사진을 등록해주세요</div>
+        <small>탭하여 사진 선택</small>
+      </div>
+      <div class="overlay" id="overlay">
+        <div class="align-toolbar">
+          <button class="align-btn" data-align="left" aria-label="왼쪽 정렬"><span class="align-icon align-icon-left"><i></i><i></i><i></i></span></button>
+          <button class="align-btn active" data-align="center" aria-label="가운데 정렬"><span class="align-icon align-icon-center"><i></i><i></i><i></i></span></button>
+          <button class="align-btn" data-align="right" aria-label="오른쪽 정렬"><span class="align-icon align-icon-right"><i></i><i></i><i></i></span></button>
+        </div>
+        <div class="title-text align-center" id="titleText" contenteditable="true" data-placeholder="제목을 입력하세요"></div>
+        <div class="date-text align-center" id="dateText" contenteditable="true"></div>
+      </div>
+      <input type="file" id="fileInput" accept="image/*" hidden>
+    </div>
+
+    <div class="panel">
+      <div>
+        <div class="field-label">태그</div>
+        <div class="tag-box" id="tagBox">
+          <input id="tagInput" placeholder="태그 입력 후 Enter">
+          <button type="button" id="tagAddBtn" aria-label="태그 추가">추가</button>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="ghost" id="resetBtn">초기화</button>
+        <button class="primary" id="saveBtn" disabled>저장하기</button>
+      </div>
+    </div>
+  </main>
+
+  <section class="gallery-section">
+    <div class="field-label">저장된 기록</div>
+    <div class="gallery-grid" id="galleryGrid"></div>
+    <div class="gallery-empty" id="galleryEmpty">아직 저장된 사진이 없어요</div>
+  </section>
+</div>
+
+<script>
+  const photoFrame = document.getElementById('photoFrame');
+  const fileInput = document.getElementById('fileInput');
+  const photoImg = document.getElementById('photoImg');
+  const emptyState = document.getElementById('emptyState');
+  const overlay = document.getElementById('overlay');
+  const titleText = document.getElementById('titleText');
+  const dateText = document.getElementById('dateText');
+  const tagBox = document.getElementById('tagBox');
+  const tagInput = document.getElementById('tagInput');
+  const saveBtn = document.getElementById('saveBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const galleryGrid = document.getElementById('galleryGrid');
+  const galleryEmpty = document.getElementById('galleryEmpty');
+
+  let currentImageData = null;
+  let tags = [];
+  let currentAlign = 'center';
+  let localEntries = [];
+  const STORAGE_KEY = 'ppphoto_entries';
+
+  function todayStr(){
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,'0');
+    const day = String(d.getDate()).padStart(2,'0');
+    return `${y}.${m}.${day}`;
+  }
+
+  function setAlign(align){
+    currentAlign = align;
+    titleText.className = 'title-text align-' + align;
+    dateText.className = 'date-text align-' + align;
+    document.querySelectorAll('.align-btn').forEach(b=>{
+      b.classList.toggle('active', b.dataset.align === align);
+    });
+  }
+
+  document.querySelectorAll('.align-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=> setAlign(btn.dataset.align));
+  });
+
+  photoFrame.addEventListener('click', (e)=>{
+    if(!currentImageData){ fileInput.click(); }
+  });
+
+  fileInput.addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      currentImageData = ev.target.result;
+      photoImg.src = currentImageData;
+      photoImg.style.display = 'block';
+      emptyState.style.display = 'none';
+      overlay.classList.add('show');
+      dateText.textContent = todayStr();
+      saveBtn.disabled = false;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  function addTag(value){
+    const v = value.trim();
+    if(!v || tags.includes(v)) return;
+    tags.push(v);
+    renderTags();
+  }
+
+  function renderTags(){
+    tagBox.querySelectorAll('.tag-chip').forEach(c=>c.remove());
+    tags.forEach(t=>{
+      const chip = document.createElement('div');
+      chip.className = 'tag-chip';
+      chip.innerHTML = `#${t} <button aria-label="삭제">×</button>`;
+      chip.querySelector('button').addEventListener('click', ()=>{
+        tags = tags.filter(x=>x!==t);
+        renderTags();
+      });
+      tagBox.insertBefore(chip, tagInput);
+    });
+  }
+
+  const tagAddBtn = document.getElementById('tagAddBtn');
+
+  tagInput.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter' && !e.isComposing){
+      e.preventDefault();
+      addTag(tagInput.value);
+      tagInput.value = '';
+    }
+  });
+
+  tagAddBtn.addEventListener('click', ()=>{
+    addTag(tagInput.value);
+    tagInput.value = '';
+    tagInput.focus();
+  });
+
+  function resetEditor(){
+    currentImageData = null;
+    photoImg.src = '';
+    photoImg.style.display = 'none';
+    emptyState.style.display = 'flex';
+    overlay.classList.remove('show');
+    titleText.textContent = '';
+    dateText.textContent = '';
+    tags = [];
+    renderTags();
+    tagInput.value = '';
+    saveBtn.disabled = true;
+    fileInput.value = '';
+    setAlign('center');
+  }
+
+  resetBtn.addEventListener('click', resetEditor);
+
+  function loadGallery(){
+    try{
+      const raw = localStorage.getItem(STORAGE_KEY);
+      localEntries = raw ? JSON.parse(raw) : [];
+    }catch(err){
+      console.error('갤러리 로드 실패', err);
+      localEntries = [];
+    }
+    renderGallery(localEntries);
+  }
+
+  function persistEntries(){
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(localEntries));
+      return true;
+    }catch(err){
+      console.error('저장 실패', err);
+      return false;
+    }
+  }
+
+  function renderGallery(entries){
+    galleryGrid.innerHTML = '';
+    if(entries.length === 0){
+      galleryEmpty.style.display = 'block';
+      return;
+    }
+    galleryEmpty.style.display = 'none';
+    entries.forEach(entry=>{
+      const item = document.createElement('div');
+      item.className = 'gallery-item';
+      const tagsHtml = (entry.tags && entry.tags.length)
+        ? `<div class="g-tags">${entry.tags.map(t=>'#'+t).join(' ')}</div>`
+        : '';
+      item.innerHTML = `
+        <img src="${entry.image}" alt="${entry.title || ''}">
+        <div class="g-overlay">
+          <div class="g-title" style="text-align:${entry.align || 'center'}">${entry.title || ''}</div>
+          <div class="g-date" style="text-align:${entry.align || 'center'}">${entry.date || ''}</div>
+          ${tagsHtml}
+        </div>
+      `;
+      galleryGrid.appendChild(item);
+    });
+  }
+
+  saveBtn.addEventListener('click', async ()=>{
+    if(!currentImageData) return;
+    const entry = {
+      image: currentImageData,
+      title: titleText.textContent,
+      date: dateText.textContent,
+      align: currentAlign,
+      tags: tags,
+      createdAt: Date.now()
+    };
+    saveBtn.disabled = true;
+    saveBtn.textContent = '저장 중...';
+
+    localEntries.unshift(entry);
+    const ok = persistEntries();
+    renderGallery(localEntries);
+    resetEditor();
+    saveBtn.textContent = '저장하기';
+
+    if(!ok){
+      alert('저장 공간이 가득 찼어요. 오래된 사진을 정리하면 다시 저장할 수 있어요.');
+    }
+  });
+
+  // init
+  setAlign('center');
+  loadGallery();
+</script>
+</body>
+</html>
