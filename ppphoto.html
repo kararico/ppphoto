@@ -316,9 +316,31 @@
     overflow:hidden;
     background:var(--surface);
     border:1px solid var(--purple-deep);
+    cursor:pointer;
+  }
+  .gallery-item:hover{
+    border-color: var(--purple-line);
+  }
+  .gallery-item:hover .g-download{
+    opacity:1;
   }
   .gallery-item img{
     width:100%;height:100%;object-fit:cover;
+  }
+  .gallery-item .g-download{
+    position:absolute;
+    top:8px;
+    right:8px;
+    z-index:2;
+    width:28px;height:28px;
+    border-radius:8px;
+    background: rgba(15,8,18,0.7);
+    border:1px solid var(--purple-line);
+    color:var(--white);
+    display:flex;align-items:center;justify-content:center;
+    font-size:14px;
+    opacity:0.85;
+    pointer-events:none;
   }
   .gallery-item .g-overlay{
     position:absolute;inset:0;
@@ -539,6 +561,118 @@
     }
   }
 
+  function safeFileName(title, date){
+    const base = (title && title.trim()) ? title.trim() : 'ppphoto';
+    const stamp = (date && date.trim()) ? date.trim().replace(/\./g, '-') : String(Date.now());
+    return (base + '_' + stamp)
+      .replace(/[\\/:*?"<>|]+/g, '_')
+      .replace(/\s+/g, '_')
+      .slice(0, 80) + '.jpg';
+  }
+
+  function downloadDataUrl(dataUrl, filename){
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }
+
+  async function downloadEntry(entry){
+    try{
+      const img = new Image();
+      img.src = entry.image;
+      await img.decode();
+
+      const targetRatio = 3 / 4;
+      const srcW = img.naturalWidth;
+      const srcH = img.naturalHeight;
+      const srcRatio = srcW / srcH;
+
+      let sx = 0, sy = 0, sw = srcW, sh = srcH;
+      if(srcRatio > targetRatio){
+        sw = srcH * targetRatio;
+        sx = (srcW - sw) / 2;
+      }else if(srcRatio < targetRatio){
+        sh = srcW / targetRatio;
+        sy = (srcH - sh) / 2;
+      }
+
+      const outW = Math.min(1200, Math.round(sw));
+      const outH = Math.round(outW / targetRatio);
+      const canvas = document.createElement('canvas');
+      canvas.width = outW;
+      canvas.height = outH;
+      const ctx = canvas.getContext('2d');
+
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outW, outH);
+
+      const grad = ctx.createLinearGradient(0, outH * 0.4, 0, outH);
+      grad.addColorStop(0, 'rgba(6,2,7,0)');
+      grad.addColorStop(0.45, 'rgba(6,2,7,0.15)');
+      grad.addColorStop(1, 'rgba(6,2,7,0.75)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, outW, outH);
+
+      const pad = Math.round(outW * 0.048);
+      const align = entry.align || 'center';
+      ctx.textAlign = align === 'left' ? 'left' : align === 'right' ? 'right' : 'center';
+      const tx = align === 'left' ? pad : align === 'right' ? outW - pad : outW / 2;
+
+      const title = entry.title || '';
+      const date = entry.date || '';
+      const titleSize = Math.round(outW * 0.076);
+      const dateSize = Math.round(outW * 0.033);
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `800 ${titleSize}px "Noto Sans KR","Noto Sans",sans-serif`;
+      ctx.textBaseline = 'bottom';
+
+      const lines = [];
+      if(title){
+        const maxW = outW - pad * 2;
+        let line = '';
+        for(const ch of title){
+          const test = line + ch;
+          if(ctx.measureText(test).width > maxW && line){
+            lines.push(line);
+            line = ch;
+          }else{
+            line = test;
+          }
+        }
+        if(line) lines.push(line);
+      }
+
+      let y = outH - pad;
+      if(date){
+        ctx.font = `500 ${dateSize}px "Noto Sans KR","Noto Sans",sans-serif`;
+        ctx.fillStyle = 'rgba(255,255,255,0.8)';
+        ctx.fillText(date, tx, y);
+        y -= dateSize + Math.round(outW * 0.018);
+      }
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `800 ${titleSize}px "Noto Sans KR","Noto Sans",sans-serif`;
+      const lineH = titleSize * 1.2;
+      for(let i = lines.length - 1; i >= 0; i--){
+        ctx.fillText(lines[i], tx, y);
+        y -= lineH;
+      }
+
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+      downloadDataUrl(dataUrl, safeFileName(title, date));
+    }catch(err){
+      console.error('다운로드 실패', err);
+      if(entry.image){
+        downloadDataUrl(entry.image, safeFileName(entry.title, entry.date).replace(/\.jpg$/, '.png'));
+      }else{
+        alert('이미지를 다운로드할 수 없어요.');
+      }
+    }
+  }
+
   function renderGallery(entries){
     galleryGrid.innerHTML = '';
     if(entries.length === 0){
@@ -549,17 +683,29 @@
     entries.forEach(entry=>{
       const item = document.createElement('div');
       item.className = 'gallery-item';
+      item.title = '클릭하여 이미지 다운로드';
+      item.setAttribute('role', 'button');
+      item.setAttribute('tabindex', '0');
+      item.setAttribute('aria-label', (entry.title || '사진') + ' 다운로드');
       const tagsHtml = (entry.tags && entry.tags.length)
         ? `<div class="g-tags">${entry.tags.map(t=>'#'+t).join(' ')}</div>`
         : '';
       item.innerHTML = `
         <img src="${entry.image}" alt="${entry.title || ''}">
+        <div class="g-download" aria-hidden="true">↓</div>
         <div class="g-overlay">
           <div class="g-title" style="text-align:${entry.align || 'center'}">${entry.title || ''}</div>
           <div class="g-date" style="text-align:${entry.align || 'center'}">${entry.date || ''}</div>
           ${tagsHtml}
         </div>
       `;
+      item.addEventListener('click', ()=> downloadEntry(entry));
+      item.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter' || e.key === ' '){
+          e.preventDefault();
+          downloadEntry(entry);
+        }
+      });
       galleryGrid.appendChild(item);
     });
   }
